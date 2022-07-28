@@ -19,14 +19,14 @@
 
 
 //Constructor
-qCalSD::qCalSD(G4String SDname, G4double absLen, G4double cubeSize, G4int noOfZ)
-: G4VSensitiveDetector(SDname), fSiPMHitCollection(0),fSiPMPositionsX(0),fSiPMPositionsY(0),fSiPMPositionsZ(0)
+qCalSD::qCalSD(G4String SDname, G4double fTotalCubeWidth, G4double fTotalCubeDepth, G4double fAbsLen)
+: G4VSensitiveDetector(SDname), fSiPMHitCollection(0),fSiPMPositionsX(0),fSiPMPositionsY(0),fSiPMPositionsZ(0) //is this declaring variables?
 {
    collectionName.insert("SiPMHitCollection");
-   //p_fAbsLen = absLen;
-   //p_fcubeSize = cubeSize;
-   //p_nZAxis = noOfZ;
-   p_offsetZ = -10000;
+   p_fTotalCubeWidth = fTotalCubeWidth*2; //needs to be full length
+   p_fTotalCubeDepth = fTotalCubeDepth*2;
+   p_fAbsLen = fAbsLen*2;
+
 }
 
 //Destructor
@@ -37,11 +37,9 @@ void qCalSD::Initialize(G4HCofThisEvent* hitsCE)
 {
    fSiPMHitCollection = new qCalSiPMHitsCollection(SensitiveDetectorName, collectionName[0]);
    //Store collection with event and keep ID
-   static G4int hitCID = -1;
-   if(hitCID<0)
-   {
-      hitCID = GetCollectionID(0);
-   }
+
+   G4int hitCID = G4SDManager::GetSDMpointer()->GetCollectionID(collectionName[0]);
+
    hitsCE->AddHitsCollection( hitCID, fSiPMHitCollection );
 }
 
@@ -49,139 +47,69 @@ void qCalSD::Initialize(G4HCofThisEvent* hitsCE)
 //Process Hits (Required)
 G4bool qCalSD::ProcessHits(G4Step* step, G4TouchableHistory*)
 {
+   //if there's no photon hits, return false
    if (step->GetTrack()->GetDefinition() != G4OpticalPhoton::OpticalPhotonDefinition())
    {
       return false;
    }
    
    G4StepPoint* preStepPoint = step->GetPreStepPoint();
-   G4Track *aTrack = step->GetTrack() ;
+   //G4Track *aTrack = step->GetTrack(); //necessary?
 
    auto touchable = (G4TouchableHistory*)(preStepPoint->GetTouchable());
-   ///
 
+   //gets the position of the hit as a vector
    G4ThreeVector copyNoPos = touchable->GetTranslation();
-   /////Storing the smallest vector(which will be (0,0,0), as well as the second smallest which will be (0,0,1);
-   G4double tempX = copyNoPos.getX()/cm;
-   G4double tempY = copyNoPos.getY()/cm;
-   G4double tempZ = copyNoPos.getZ()/cm;
-   G4ThreeVector posVector = G4ThreeVector(tempX, tempY, tempZ);
 
-   if (fabs(p_offsetZ) > fabs(tempZ)){
-      p_offsetZ = tempZ;
-   }
+   G4double fTempX = copyNoPos.getX() / p_fTotalCubeWidth;
+   G4double fTempY = copyNoPos.getY() / p_fTotalCubeWidth;
+   G4double fTempZ = copyNoPos.getZ() / (p_fTotalCubeDepth + p_fAbsLen);
 
+   //takes coordinate position of the hit and converts it to the position of the cube it was in
+   G4double fCubeNumX = fTempX - fmod(fTempX, 1);
+   G4double fCubeNumY = fTempY - fmod(fTempY, 1);
+   G4double fCubeNumZ = fTempZ - fmod(fTempZ, 1);
 
-   ///
-   //G4int copyNo                  = touchable->GetVolume()->GetCopyNo();
+   //argument variables for adding a new qCalHit later
+   G4ThreeVector cubeVector = G4ThreeVector(fCubeNumX, fCubeNumY, fCubeNumZ);
+   //THE SIPM NUMBER WILL BREAK IF NOT 4x4x4
+   G4double SiPMNumber = (fCubeNumX + fCubeNumY * 4 + fCubeNumZ * 16); //takes cube position and turns it into SiPM id, counting the SiPMs layer-wise from the bottom left (in an X-Y plane)
    G4double hitTime              = preStepPoint->GetGlobalTime();
-   G4double photonWavelength     = 4.15e-15*3e8/(step->GetTrack()->GetTotalEnergy()/eV)*1e9;  //nm
-   qCalHit* hit = nullptr;
-   G4int isHit = 0;
-   
-   // Simulating the Hamamatsu S13360-**75CS
-   // https://www.hamamatsu.com/resources/pdf/ssd/s13360_series_kapd1052e.pdf
-   
-   if (photonWavelength >= 280 && photonWavelength < 300) isHit = (rand() % 100) < 15;
-   else if (photonWavelength >= 300 && photonWavelength < 350) isHit = (rand() % 100) < 30*0.85;
-   else if (photonWavelength >= 350 && photonWavelength < 400) isHit = (rand() % 100) < 40*0.85;
-   else if (photonWavelength >= 400 && photonWavelength < 500) isHit = (rand() % 100) < 47*0.85;
-   else if (photonWavelength >= 500 && photonWavelength < 550) isHit = (rand() % 100) < 45*0.85;
-   else if (photonWavelength >= 550 && photonWavelength < 600) isHit = (rand() % 100) < 35*0.85;
-   else if (photonWavelength >= 600 && photonWavelength < 700) isHit = (rand() % 100) < 25*0.85;
-   else if (photonWavelength >= 700 && photonWavelength < 800) isHit = (rand() % 100) < 15*0.85;
-   else if (photonWavelength >= 800 && photonWavelength < 900) isHit = (rand() % 100) < 5*0.85;
+   G4double photonWavelength     = 4.15e-15*3e8/(step->GetTrack()->GetTotalEnergy()/eV)*1e9;
+  
 
-   if (isHit == 1) //if ( hit == nullptr && isHit == 1)
+   qCalHit* hit = nullptr;
+
+   //simulating the AFBR-S4N33C013 Broadcom
+   //https://docs.broadcom.com/doc/AFBR-S4N33C013-DS
+
+   G4int isHit = 0;
+   if (photonWavelength >= 300 && photonWavelength < 350 && (rand() % 100) < 42.5) isHit = 1;
+   else if (photonWavelength >= 350 && photonWavelength < 400 && (rand() % 100) < 47.5) isHit = 1;
+   else if (photonWavelength >= 400 && photonWavelength < 450 && (rand() % 100) < 52.5) isHit = 1;
+   else if (photonWavelength >= 450 && photonWavelength < 500 && (rand() % 100) < 45) isHit = 1;
+   else if (photonWavelength >= 500 && photonWavelength < 550 && (rand() % 100) < 37.5) isHit = 1;
+   else if (photonWavelength >= 550 && photonWavelength < 600 && (rand() % 100) < 32.5) isHit = 1;
+   else if (photonWavelength >= 600 && photonWavelength < 700 && (rand() % 100) < 35) isHit = 1;
+   else if (photonWavelength >= 700 && photonWavelength < 800 && (rand() % 100) < 15) isHit = 1;
+   else if (photonWavelength >= 800 && photonWavelength < 900 && (rand() % 100) < 7.5) isHit = 1;
+
+   if (isHit == 1)
    {
-      hit = new qCalHit(posVector, hitTime, photonWavelength);
+      hit = new qCalHit(cubeVector, SiPMNumber, hitTime, photonWavelength);
       fSiPMHitCollection->insert(hit);
       hit->SetDrawit(true);
       hit->IncPhotonCount();
    }
-   aTrack->SetTrackStatus(fStopAndKill);
-   //mapOfHits.clear();
+   //aTrack->SetTrackStatus(fStopAndKill); //necessary?
+
    return false;
 }
 
-//Generates a hit and uses the postStepPoint's mother volume replica number
-//PostStepPoint because the hit is generated manually when the photon is
-//absorbed by the photocathode
-//G4bool qCalSD::ProcessHits_constStep(const G4Step* aStep,
-//                                       G4TouchableHistory* ){
-//
-//   //need to know if this is an optical photon
-//   if (aStep->GetTrack()->GetDefinition() != G4OpticalPhoton::OpticalPhotonDefinition())
-//   {
-//      return false;
-//   }
-//
-//   //User replica number 1 since photocathode is a daughter volume
-//   //to the pmt which was replicated
-//   G4int SiPMNumber = aStep->GetPostStepPoint()->GetTouchable()->GetVolume()->GetCopyNo();
-//   G4VPhysicalVolume* physVol = aStep->GetPostStepPoint()->GetTouchable()->GetVolume();
-//
-//   //Find the correct hit collection
-//   G4int n = fSiPMHitCollection->entries();
-//   qCalHit* hit=NULL;
-//   for ( G4int i = 0; i < n; i++ )
-//   {
-//      if ( (*fSiPMHitCollection)[i]->GetSiPMNumber() == SiPMNumber)
-//      {
-//         hit = (*fSiPMHitCollection)[i];
-//         break;
-//      }
-//   }
-//
-//   if ( hit==NULL){//this pmt wasnt previously hit in this event
-//      hit = new qCalHit(); //so create new hit
-//      hit->SetSiPMNumber(SiPMNumber);
-//      hit->SetSiPMPhysVol(physVol);
-//      fSiPMHitCollection->insert(hit);
-//      hit->SetSiPMPos((*fSiPMPositionsX)[SiPMNumber],(*fSiPMPositionsY)[SiPMNumber],
-//                     (*fSiPMPositionsZ)[SiPMNumber]);
-//   }
-//
-//   hit->IncPhotonCount(); //increment hit for the selected pmt
-//
-//   hit->SetDrawit(true);
-//
-//   return true;
-//}
-
-//End event (Required)
-
-
-
 void qCalSD::EndOfEvent(G4HCofThisEvent*) {
-   // The following iterative method below is used calculate the Z-offset that converts the raw
-   // floating-point z component of the detector to an integer value, this value is constant with SiPM dimensions
-   // but scales strongly with absorber material. If the SiPM X and Y dimensions change offsetX and offsetY need
-   // have to be calculated. Direct formulas for the offsets may be needed in the future.
+   
+   //((qCalDetectorConstruction*)G4RunManager::GetRunManager()->GetUserDetectorConstruction())->SetCoordOffsetZ(p_offsetZ);
 
-   //G4double offsetX;
-   //G4double offsetY;
-   //G4double offsetZ = -10000;
-   /*
-   for (auto iter = mapOfHits.cbegin(); iter != mapOfHits.cend(); iter++) {
-      G4ThreeVector posAt = iter->first;
-
-      if (fabs(offsetX) >= fabs(posAt.getX() {
-         offsetX = posAt.getX());
-      }
-      if (fabs(offsetY) >= fabs(posAt.getY(){
-         offsetY = posAt.getY());
-      }
-
-      G4double currentZ = posAt.getZ();
-      if (fabs(offsetZ) >= fabs(currentZ)){
-         offsetZ = currentZ;
-      }
-   }
-   */
-   ((qCalDetectorConstruction*)G4RunManager::GetRunManager()->GetUserDetectorConstruction())->SetCoordOffsetZ(p_offsetZ);
-
-   //mapOfHits.clear();
 
 }
 

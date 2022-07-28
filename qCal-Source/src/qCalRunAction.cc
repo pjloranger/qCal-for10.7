@@ -1,103 +1,73 @@
 #include "qCalRunAction.hh"
-#include "qCalAnalysis.hh"
-#include "qCalRunMessenger.hh"
 #include "qCalDetectorConstruction.hh"
 #include "qCalEventAction.hh"
+#include "qCalRunMessenger.hh"
+
 #include "G4Run.hh"
 #include "G4RunManager.hh"
 #include "G4UnitsTable.hh"
 #include "G4SystemOfUnits.hh"
+#include "g4root.hh"
 
 
 
 qCalRunAction::qCalRunAction(qCalEventAction* eventAction)
-: G4UserRunAction(), fEventAction(eventAction),
-SDVolume(((qCalDetectorConstruction*)G4RunManager::GetRunManager()->
-        GetUserDetectorConstruction())->GetVolume())
+: G4UserRunAction()
 {
    p_runActionOutputFileName = "qCalOutputFile.root";
    G4RunManager::GetRunManager()->SetPrintProgress(1);
    
    auto analysisManager = G4AnalysisManager::Instance();
-   G4cout << "Using " << analysisManager->GetType() << G4endl;
    
-   // Create directories
-   //analysisManager->SetHistoDirectoryName("histograms");
-   //analysisManager->SetNtupleDirectoryName("ntuple");
-   
-   analysisManager->SetVerboseLevel(1);
-   analysisManager->SetNtupleMerging(true);
-   // Creating histograms
-    std::string id;
+   analysisManager->SetVerboseLevel(4);
 
-   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-   // Histogram Definitions
-   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-   //Proto Histogram examples:
-   //analysisManager->CreateH1("0","Photon Wavelength Per SiPM Hit", 250, 0., 1000);
+   //creating histograms
    analysisManager->CreateH1("TimingHist", "HitTimesPerSiPM", 10, 0, 10000);
-   analysisManager->CreateH1("PhotonCountHist","# of Photons per Event", 100*100, 0., 100*100*1000);
-
-   //analysisManager->CreateH1("Labs","trackL in absorber", 100, 0., 1*m);
-   //analysisManager->CreateH1("Lgap","trackL in gap", 100, 0., 50*cm);
-
-   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-   // Extra Detector information to be stored in ntuples:
-   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-   std::vector<G4double> detectorAxisValues = ((qCalDetectorConstruction*)G4RunManager::GetRunManager()->
-         GetUserDetectorConstruction())->GetDetectorAxisValues();
-
-   G4String detectorAbsMaterial = ((qCalDetectorConstruction*)G4RunManager::GetRunManager()->
-         GetUserDetectorConstruction())->GetAbsMaterial();
-   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-   // nTuple Definitions
-   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+   analysisManager->CreateH1("PhotonCountHist","# of Photons per Event", 100*100, 0., 1000);
 
    analysisManager->CreateNtuple("qCal", "Simulation Data");
-   analysisManager->CreateNtupleIColumn("SiPMPositionX", fEventAction->GetSiPMCoordsX()); // ID 0
-   analysisManager->CreateNtupleIColumn("SiPMPositionY", fEventAction->GetSiPMCoordsY()); // ID 1
-   analysisManager->CreateNtupleIColumn("SiPMPositionZ", fEventAction->GetSiPMCoordsZ()); // ID 2
-   analysisManager->CreateNtupleDColumn("SiPMNumbers", fEventAction->GetSiPMNums()); // ID 3
-   analysisManager->CreateNtupleDColumn("PhotonCounts", fEventAction->GetPhotonCount()); // ID 4
-   analysisManager->CreateNtupleDColumn("HitTimes", fEventAction->GetHitTimes()); // ID 5
+   analysisManager->CreateNtupleIColumn("SiPMPositionX", eventAction->GetSiPMCoordsX()); // ID 0
+   analysisManager->CreateNtupleIColumn("SiPMPositionY", eventAction->GetSiPMCoordsY()); // ID 1
+   analysisManager->CreateNtupleIColumn("SiPMPositionZ", eventAction->GetSiPMCoordsZ()); // ID 2
+   analysisManager->CreateNtupleDColumn("SiPMNumbers", eventAction->GetSiPMNums()); // ID 3
+   analysisManager->CreateNtupleDColumn("PhotonCounts", eventAction->GetPhotonCount()); // ID 4
+   analysisManager->CreateNtupleDColumn("HitTimes", eventAction->GetHitTimes()); // ID 5
    analysisManager->FinishNtuple();
 
-   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-   // Filling Constant Ntuples:
-   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  // analysisManager->FillNtupleSColumn(3, detectorAbsMaterial);
-
    p_fRunMessenger = new qCalRunMessenger(this);
+
 }
 
 qCalRunAction::~qCalRunAction()
 {
-   delete G4AnalysisManager::Instance();
+	//i think not deleting the analysismanager might be important
+	delete G4AnalysisManager::Instance();
 }
 
 void qCalRunAction::BeginOfRunAction(const G4Run* /*run*/)
 {
-   //inform the runManager to save random number seed
-   //G4RunManager::GetRunManager()->SetRandomNumberStore(true);
-   
+   G4cout << "BeginOfRunAction START" << G4endl;
    // Get analysis manager
    auto analysisManager = G4AnalysisManager::Instance();
+   analysisManager->SetVerboseLevel(4);
 
    // Open an output file
-   G4String fileName = "Muons";
-   G4cout << "FileName " << p_runActionOutputFileName << G4endl;
    analysisManager->OpenFile(p_runActionOutputFileName);
+   G4cout << "BeginOfRunAction END" << G4endl;
 }
 
 
 
 void qCalRunAction::EndOfRunAction(const G4Run* /*run*/)
 {
+   G4cout << "EndOfRunAction START" << G4endl;
    auto analysisManager = G4AnalysisManager::Instance();
+   analysisManager->SetVerboseLevel(4);
 
    // save histograms & ntuple
-   analysisManager->Write();
+   analysisManager->Write(); //Crashes here
    analysisManager->CloseFile();
+   G4cout << "EndOfRunAction END" << G4endl;
 }
 
 void qCalRunAction::SetOutputFileName(G4String outputFileNameByCmd)

@@ -17,8 +17,8 @@
 
 G4ThreadLocal G4Allocator<qCalHit>* qCalSiPMHitAllocator=0;
 
-qCalHit::qCalHit(G4ThreeVector i, G4double t, G4double E)
-:fCoord(i), fSiPMNumber(0), fPhotons(0),fPhysVol(0),fDrawit(false),G4VHit(), fTime(t), fEnergy(E)
+qCalHit::qCalHit(G4ThreeVector i, G4double id, G4double t, G4double E)
+:G4VHit(), fTime(t), fSiPMNumber(id), fEnergy(E), fPhysVol(0), fCoord(i), fPhotons(0), fDrawit(false)
 {
 
 }
@@ -30,28 +30,10 @@ qCalHit::~qCalHit()
 
 void qCalHit::Draw()
 {
-//   if( fDrawit&&fPhysVol )
-//   { //ReDraw only the PMTs that have hit counts > 0
-//      //Also need a physical volume to be able to draw anything
-//      G4VVisManager* pVVisManager = G4VVisManager::GetConcreteInstance();
-//      if ( pVVisManager )
-//      { //Make sure that the VisManager exists
-//         G4VisAttributes attribs(G4Colour(1.,0.,0.));
-//         attribs.SetForceSolid(true);
-//         G4RotationMatrix rot;
-//         if ( fPhysVol->GetRotation() )//If a rotation is defined use it
-//         {
-//            rot=*(fPhysVol->GetRotation());
-//         }
-//         G4Transform3D trans(rot,fPhysVol->GetTranslation());//Create transform
-//         pVVisManager->Draw(*fPhysVol,attribs,trans);//Draw it
-//      }
-//   }
 }
 
 void qCalHit::Print()
 {
-   //G4cout << "SiPM[" << fSiPMNumber << "] " << fTime/ns << " (nsec)" << " Wavelength: " << fEnergy << " nm" << G4endl;
 }
 
 

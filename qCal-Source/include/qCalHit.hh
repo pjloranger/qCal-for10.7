@@ -18,7 +18,7 @@ class G4VTouchable;
 class qCalHit : public G4VHit
 {
 public:
-   qCalHit(G4ThreeVector i, G4double t, G4double E);
+   qCalHit(G4ThreeVector i, G4double id, G4double t, G4double E);
    virtual ~qCalHit();
    
    inline void *operator new(size_t);

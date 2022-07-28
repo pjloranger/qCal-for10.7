@@ -36,16 +36,23 @@ units = sys.argv[2]
 ## $> # - -  (2nd file)
 ## $> # # -  (3rd file)
 ## $> # # #  (finished)
+
+def sigfig(x, p):
+   #x is the number to be limited, p is the number of sig figs
+   #developed by Anson Man, SSTP
+   
+   return round(x, p-int(np.log10(abs(x)))-1)
+
 def printProgress(currentFile, totalFiles):
-   print ""
-   print "Progress: ",
+   print("")
+   print("Progress: "),
    progress = totalFiles - currentFile
    for i in range(0,currentFile):
-      print "#",
+      print("#"),
    for i in range(0,progress):
-      print "-",
-   print ""
-   print ""
+      print("-"),
+   print("")
+   print("")
 
 objCount = 2
 ################################
@@ -73,7 +80,7 @@ for file in os.listdir("."):                                  # Loop over the fi
    if file.endswith("10000.root") and file.split("-")[1].split("_")[0] == units:                                # Look only for .root files
       if file.startswith("Analyzed"):                          # Ignore the output ROOT file so you can recreate it each time.
          continue
-      energies.append(int(file.split("_")[1].split("-")[0]))   # This takes the energy from the root file name:  muons_120-GeV_1k.root -> 120
+      energies.append(float(file.split("_")[1].split("-")[0]))   # This takes the energy from the root file name:  muons_120-GeV_1k.root -> 120
       files[energies[fileIterator]] = file
       fileIterator+=1
 
@@ -83,13 +90,16 @@ fileIterator = 0
 for E, file in files.iteritems(): 
 
    #printProgress(file,len(files))                                                                        # Print progress
-   processLine = '.x analyzeCal.C+("{0}")'.format(file) 
+   processLine = '.x /Users/ploranger/qCal_4x4x4_output/electrons/analysis/analyzeCal.C+("{0}")'.format(file) 
    #processLine = '.x ~/Dropbox/Research/GEANT/qCal/Analysis/analyzeCal.C+("{0}")'.format(files[file])    # format ROOT command for running analyzeCal.C
    # Run analyzeCal.C in ROOT runtime environment
    r.gROOT.ProcessLine(processLine)  
   
    hists[E] =     r.gROOT.FindObject("PhotonCountHist")                                       # After running, analyzeCal.C returns a TH1F
    hists[E].SetName("PhotonCountHist" + str(energies[fileIterator]))                   # Change the name of the histogram to current energy, prefixed by object name
+   hists[E].SetTitle("# of Photons per Event;# of Photons;Frequency")
+   hists[E].GetXaxis().CenterTitle(True)
+   hists[E].GetYaxis().CenterTitle(True)
    hists[E].SetDirectory(0)                                                                           # Decouple the histogram object from the ROOT environment
    outF.cd()                                                                                             # Change Directory (cd) to Analyzed.root file to save histogram
    hists[E].Write()                                                                                   # Save the histogram to the Analyzed.root file
@@ -97,35 +107,63 @@ for E, file in files.iteritems():
    fileIterator+=1
 
 ## MAKE A CANVAS
-canvas = r.TCanvas("canv1","Hits per GeV",800,800)    # Create a blank canvas to draw the histograms onto
+canvas = r.TCanvas("canv1","Hits per GeV",1100,800)    # Create a blank canvas to draw the histograms onto
 canvas.cd()       
-#canvas.SetLogy()                                # Set this canvas to the current active canvas
-#canvas.GetXaxis().SetRangeUser(0, 30000)
-
-                                     # Make the y-axis log scale
 
 ## FIT THE HISTOGRAMS && AND DRAW ON CANVAS
 actualEnergies = np.sort(np.array([n for n in energies]))
 
-for E, file in files.iteritems(): 
-   fit = r.TF1("gaus","gaus(0)")                         # Define the fit object to be a Gaussian
-   fit.SetParameter(1,hists[E].GetMean())             # Initialize the fit object to the mean of the histogram...
-   fit.SetParameter(2,hists[E].GetStdDev())           # ...and the std. deviation as a starting point for the fit
-   #hists[E].Scale(1/hists[E].Integral(),"Width")   # Normalize the histograms to 1
-   #hists[E].Rebin(50)
-   #hists[E].SetMarkerStyle(kFullCircle)
-   hists[E].Draw("Same PLC PMC")                              # Draw the histogram, the "Same" argument keeps previous content on the Canvas
-  
-   hists[E].Fit(fit)                                  # Fit the curve
+fitPeakY = {}
+fitPeakX = {}
+
+for E, file in files.iteritems():
+   hists[E].Rebin(50)
+   
+   # Draw the histogram, the "Same" argument keeps previous content on the Canvas
+   hists[E].Draw("Same PLC PMC")
+
+for E, file in files.iteritems():
+   xAxis = hists[E].GetXaxis()
+   peakBin = hists[E].GetMaximumBin()
+   peakX = xAxis.GetBinCenter(peakBin)
+
+   firstBin = 0 # Stores the first bin that has any data
+   
+   for N in range(peakBin):
+      if hists[E].GetBinContent(N)> 0: # If the bin has any data...
+         firstBin = N # ...Store it
+         break # Break out of loop
+
+   # Calculate distance between centers of first bin and peak bin
+   PFDelta = xAxis.GetBinCenter(peakBin)-xAxis.GetBinCenter(firstBin)
+
+   lowerBound = xAxis.GetBinCenter(peakBin)-PFDelta
+   upperBound = xAxis.GetBinCenter(peakBin)+PFDelta
+
+   fit = r.TF1("gaus","gaus(0)") # Define the fit object to be a Gaussian
+   fit.SetParameters(1,1,1)
+   fit.FixParameter(1,peakX)
+   
+   fitPeakY[E] = hists[E].GetBinContent(peakBin)       # Store the mean to the fitResults_energy array for plotting hits vs. energy
+   fitPeakX[E] = hists[E].GetBinCenter(peakBin)
+   fitStds[E] = 2*PFDelta
+
+   hists[E].Fit(fit, "B", "", lowerBound, upperBound) # Fit the curve
    fit.Draw("Same")                                      # Draw the fit onto the histogram
-   fitMeans[E] =hists[E].GetMean()       # Store the mean to the fitResults_energy array for plotting hits vs. energy
-   fitStds[E] = hists[E].GetStdDev()   
+   
+## SAVE THE HISTOGRAM
+
+canvas.SaveAs("FittedHistos.png");
+canvas.SaveAs("FittedHistos.pdf");
 
 means = np.zeros(len(actualEnergies))
 stds = np.zeros(len(actualEnergies))
+peakX = np.zeros(len(actualEnergies))
+peakY = np.zeros(len(actualEnergies))
 for i in range(0, len(actualEnergies)):
    E = actualEnergies[i]
-   means[i] = fitMeans[E]
+   peakY[i] = fitPeakY[E]
+   peakX[i] = fitPeakX[E]
    stds[i] = fitStds[E]
    #print("ENERGY: ", E, "MEAN: ", fitMeans[E], "STD: ", fitStds[E])
 
@@ -134,6 +172,7 @@ row0 = ['0']
 row1 = ['1']
 row2 = ['2']
 row3 = ['3']
+row4 = ['4']
 
 # the actual energies need MeV, GeV
 # no the python script needs a command line argument that is MeV or GeV
@@ -143,8 +182,10 @@ row3 = ['3']
 # the catch is this folder contains only GeV files with MeV names 
 for i in range(0, len(actualEnergies)):
    row1.append(str(actualEnergies[i]))
-   row2.append(str(means[i]))
-   row3.append(str(stds[i]))
+   row2.append(str(peakX[i]))
+   row3.append(str(peakY[i]))
+   row4.append(str(stds[i]))
+
 
 rows = [row0, row1, row2, row3]
 with open(particle + "_" + units + '.csv', 'w') as writeFile:
@@ -152,3 +193,41 @@ with open(particle + "_" + units + '.csv', 'w') as writeFile:
    writer = csv.writer(writeFile)
    writer.writerows(rows)
 writeFile.close()
+
+## MAKE A CANVAS FOR ENERGY RESOLUTION GRAPH
+
+graph = r.TCanvas("canv2", particle + " Energy Resolution",800,800)    # Create a blank canvas to draw the histograms onto
+graph.cd()
+
+## MAKE A GRAPH
+
+gr = r.TGraph()
+gr.SetTitle(particle + " Energy Resolution;1/#sqrt{E} (GeV)^{-1/2};Energy Resolution (#sigma/E)")
+gr.GetXaxis().CenterTitle(True)
+gr.GetYaxis().CenterTitle(True)
+
+for J in range(len(actualEnergies)):
+   graphX = 1/np.sqrt(actualEnergies[J])
+   graphY = stds[J]/actualEnergies[J]
+   gr.SetPoint(J, graphX, graphY)
+
+gr.Draw("A* SAME")
+
+gFit = r.TF1("pol1","pol1(0)")
+gr.Fit(gFit)
+
+## PRINT LIN FIT TO CANVAS
+
+formula = str("#sigma/E" + str(sigfig(gFit.GetParameter(0), 4)) + " + " + str(sigfig(gFit.GetParameter(1), 4)) + "/#sqrt{E}")
+chiSquare = str("#chi^{2} = " + str(sigfig(gFit.GetChisquare(), 4)))
+
+latex = r.TLatex()
+latex.SetTextAlign(11)
+latex.SetTextSize(0.025)
+latex.DrawLatex(0.3, 500, formula)
+latex.DrawLatex(0.3, 460, chiSquare)
+
+graph.SaveAs("ERGraph.png");
+graph.SaveAs("ERGraph.pdf");
+
+

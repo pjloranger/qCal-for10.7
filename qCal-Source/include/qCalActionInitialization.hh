@@ -10,17 +10,16 @@ class qCalDetectorConstruction;
 class qCalActionInitialization : public G4VUserActionInitialization
 {
 public:
-    qCalActionInitialization(G4String sParticle, G4int sEnergy);
+    qCalActionInitialization(G4String sParticle, G4int nEnergy, G4double fZPosition, G4double fCubeSize);
     virtual ~qCalActionInitialization();
 
     virtual void BuildForMaster() const;
     virtual void Build() const;
 
 private:
-   qCalDetectorConstruction* p_theDetector;
-   G4double p_gunXLocation;
-   G4double p_gunYLocation;
-   G4double p_gunZLocation;
+
+   G4double p_fZPosition;
+   G4double p_fCubeSize;
    G4String startingParticle;
    G4int startingEnergy;
 };

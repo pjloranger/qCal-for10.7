@@ -11,7 +11,7 @@
 ###
 ### $1 = particle (muon, pion, electron, for filename)
 ### $2 = energy (1, 5, 25, 50, etc., in GeV)
-### $3 = location of qCal build Directory on the cluster
+### $3 = location of qCal Directory on the cluster
 ### $4 = number of events per job
 ### $5 = X dimension
 ### $6 = Y dimension
@@ -23,7 +23,7 @@ echo "/run/initialize" 				>> $1_$2_$5x$6x$7_GeV.mac
 echo "/control/verbose 0" 			>> $1_$2_$5x$6x$7_GeV.mac
 echo "/run/verbose 0"    			>> $1_$2_$5x$6x$7_GeV.mac
 echo "/event/verbose 0" 			>> $1_$2_$5x$6x$7_GeV.mac
-echo "/gun/particle mu-" 			>> $1_$2_$5x$6x$7_GeV.mac
+echo "/gun/particle proton" 			>> $1_$2_$5x$6x$7_GeV.mac
 echo "/gun/energy $2 GeV"			>> $1_$2_$5x$6x$7_GeV.mac
 echo "/run/printProgress 100" 			>> $1_$2_$5x$6x$7_GeV.mac
 echo "/qCal/outputFileName $1_$2-GeV_$5x$6x$7_$4.root" 	>> $1_$2_$5x$6x$7_GeV.mac

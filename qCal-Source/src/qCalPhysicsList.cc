@@ -17,9 +17,6 @@
 #include "G4Proton.hh"
 
 #include "qCalPhysicsList.hh"
-//#include "qCalEMPhysicsList.hh"
-//#include "qCalGeneralPhysics.hh"
-//#include "qCalMuonPhysicsList.hh"
 
 qCalPhysicsList::qCalPhysicsList()
 : G4VModularPhysicsList()
@@ -28,12 +25,6 @@ qCalPhysicsList::qCalPhysicsList()
 
 
 qCalPhysicsList::~qCalPhysicsList(){}
-
-
-void qCalPhysicsList::SetCuts()
-{
-   SetCutsWithDefault();
-}
 
 
 

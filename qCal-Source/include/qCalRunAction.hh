@@ -15,14 +15,13 @@ public:
    qCalRunAction(qCalEventAction* eventAction);
    virtual ~qCalRunAction();
    
-   virtual void BeginOfRunAction(const G4Run*);
-   virtual void EndOfRunAction(const G4Run*);
+   virtual void BeginOfRunAction(const G4Run*) override;
+   virtual void EndOfRunAction(const G4Run*) override;
    virtual void SetOutputFileName(G4String outputFileName);
    
 private:
    G4String p_runActionOutputFileName;
    qCalRunMessenger* p_fRunMessenger;
-   qCalEventAction* fEventAction;
    G4int SDVolume;
    
 };

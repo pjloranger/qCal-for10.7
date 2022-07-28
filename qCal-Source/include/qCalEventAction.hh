@@ -19,8 +19,8 @@ public:
    qCalEventAction();
    virtual ~qCalEventAction();
    
-   virtual void BeginOfEventAction(const G4Event*);
-   virtual void EndOfEventAction(const G4Event*);
+   virtual void BeginOfEventAction(const G4Event*) override;
+   virtual void EndOfEventAction(const G4Event*) override;
    //   virtual void SetSaveThreshold(G4int save);
    std::vector<G4double>& GetPhotonCount() { return fphotonCount;}
    std::vector<G4double>& GetSiPMNums() {return fSiPMNums;}

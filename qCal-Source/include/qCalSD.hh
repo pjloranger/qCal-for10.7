@@ -20,7 +20,7 @@ class qCalSD : public G4VSensitiveDetector
 {
    public:
    
-   qCalSD(G4String SDname, G4double absLen, G4double cubeSize, G4int noOfZ);
+   qCalSD(G4String SDname, G4double fTotalCubeWidth, G4double fTotalCubeDepth, G4double fAbsLen);
    virtual ~qCalSD();
 
    //    Required Functions
@@ -53,10 +53,10 @@ class qCalSD : public G4VSensitiveDetector
    G4DataVector* fSiPMPositionsX;
    G4DataVector* fSiPMPositionsY;
    G4DataVector* fSiPMPositionsZ;
-   //G4double p_fAbsLen;
-   //G4double p_fcubeSize;
-   //G4int p_nZAxis;
-   G4double p_offsetZ;
+   G4double p_fTotalCubeWidth;
+   G4double p_fTotalCubeDepth;
+   G4double p_fAbsLen;
+
 };
 
 #endif

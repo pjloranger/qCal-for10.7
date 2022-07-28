@@ -11,8 +11,5 @@ public:
    qCalPhysicsList();
    virtual ~qCalPhysicsList();
    
-   // SetCuts()
-   virtual void SetCuts();
-   
 };
 #endif
